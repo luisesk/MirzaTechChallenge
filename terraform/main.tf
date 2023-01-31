@@ -177,21 +177,63 @@ resource "aws_route53_record" "innovatehk_route53_dns" {
 # }
 
 
-module "cdn_main" {
-  source = "cloudposse/cloudfront-s3-cdn/aws"
-  version = "0.86.0"
-  name                          = "innovatehk"
-  stage                         = null
-  namespace                     = null
+# module "cdn_main" {
+#   source = "cloudposse/cloudfront-s3-cdn/aws"
+#   version = "0.86.0"
+#   name                          = "innovatehk"
+#   stage                         = null
+#   namespace                     = null
 
-//  origin_bucket                       = module.main_site_bucket.s3_bucket_id
-  origin_bucket                       = "main-site-innovatehk"
-  aliases                             = ["main.innovatehk.com"]
-  dns_alias_enabled                   = true
-  parent_zone_name                    = aws_route53_zone.innovatehk_route53_zone_new.name
-  allowed_methods                     = ["HEAD", "GET"]
-  cached_methods                      = ["HEAD", "GET"]
-  cloudfront_access_logging_enabled   = false
+# //  origin_bucket                       = module.main_site_bucket.s3_bucket_id
+#   origin_bucket                       = module.main_site_bucket.s3_bucket_website_domain
+#   aliases                             = ["innovatehk.com"]
+#   dns_alias_enabled                   = true
+#   parent_zone_name                    = aws_route53_zone.innovatehk_route53_zone_new.name
+#   allowed_methods                     = ["HEAD", "GET"]
+#   cached_methods                      = ["HEAD", "GET"]
+#   cloudfront_access_logging_enabled   = false
+
+#   depends_on = [
+#     aws_route53_zone.innovatehk_route53_zone_new,
+#     module.main_site_bucket
+#   ]
+# }
+
+module "cdn" {
+  source  = "terraform-aws-modules/cloudfront/aws"
+  is_ipv6_enabled = true
+  price_class = "PriceClass_200"
+  wait_for_deployment = false
+
+  create_origin_access_identity = true
+  origin_access_identities = {    
+    awesome_s3 = "CloudfrontS3access"
+  }
+  origin = {
+    awesome_s3 = {
+      domain_name = module.main_site_bucket.s3_bucket_website_domain
+      s3_origin_config = {
+        origin_access_identity = "awesome_s3"
+        # key in `origin_access_identities`
+      }
+    }
+  }
+
+  default_cache_behavior = {
+    target_origin_id       = "awesome_s3" # key in `origin` above
+    viewer_protocol_policy = "redirect-to-https"
+    
+    default_ttl = 5400
+    min_ttl     = 3600
+    max_ttl     = 7200
+    
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+    compress        = true
+    query_string    = false
+  }
+
+  default_root_object = "index.html"
 }
 
 //-------------------------------------------
